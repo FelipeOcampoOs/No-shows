@@ -4,12 +4,14 @@ import joblib
 from urllib.request import urlopen
 from io import BytesIO
 
-# Cargar modelo desde Hugging Face y scaler desde el repositorio
 @st.cache_resource
 def load_model_and_scaler():
     model_url = "https://huggingface.co/felipeocampo/no-shows/resolve/main/modelnoshows.joblib"
-    model = joblib.load(urlopen(model_url))
-    scaler = joblib.load("scaler.joblib")  # este archivo debe estar en tu repo local
+    response = requests.get(model_url)
+    response.raise_for_status()
+    model = joblib.load(BytesIO(response.content))
+
+    scaler = joblib.load("scaler.joblib")  # este sigue local
     return model, scaler
 
 model, scaler = load_model_and_scaler()
