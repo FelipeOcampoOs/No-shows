@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import requests
 import joblib
 from urllib.request import urlopen
 from io import BytesIO
