@@ -15,7 +15,8 @@ def load_model_and_scaler():
 model, scaler = load_model_and_scaler()
 
 st.title("Predicción de Inasistencia Médica")
-uploaded_file = st.file_uploader("Sube un archivo .xlsx con los datos a predecir", type="xlsx")
+uploaded_file = st.file_uploader("Sube un archivo .xlsx", type="xlsx")
+
 
 if uploaded_file:
     try:
