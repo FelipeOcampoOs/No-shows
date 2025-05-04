@@ -15,7 +15,7 @@ def load_model_and_scaler():
 
 model, scaler = load_model_and_scaler()
 
-st.title("Predicción de Asistencia a Citas Médicas")
+st.title("Predicción de insistencias médicas")
 
 uploaded_file = st.file_uploader("Sube tu archivo .xlsx", type="xlsx")
 
@@ -31,7 +31,6 @@ if uploaded_file:
     df["Predicción"] = df["Predicción"].replace({0: "Inasistencia", 1: "Asistencia"})
 
     st.success("Predicción completada")
-    st.dataframe(df)
 
     # Exportar archivo
     output = BytesIO()
