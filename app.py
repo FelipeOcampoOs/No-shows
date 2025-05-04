@@ -2,13 +2,12 @@ import streamlit as st
 import pandas as pd
 import joblib
 from io import BytesIO
-from urllib.request import urlopen, URLError, HTTPError
 import gzip
 
+st.set_page_config(page_title="Predicción de Inasistencia Médica", layout="centered")
+st.title("🩺 Predicción de Inasistencia Médica")
 
-st.set_page_config(page_title="No Shows - Predicción", layout="centered")
-
-
+# --- Cargar modelo y scaler ---
 @st.cache_resource
 def load_model_and_scaler():
     try:
@@ -16,30 +15,11 @@ def load_model_and_scaler():
             model = joblib.load(f)
         scaler = joblib.load("scaler.joblib")
         return model, scaler
-
     except Exception as e:
         st.error(f"❌ Error al cargar modelo o scaler: {str(e)}")
         st.stop()
-    except HTTPError as e:
-        if e.code == 429:
-            st.error("⚠️ Hugging Face está limitando las descargas. Intenta más tarde.")
-        else:
-            st.error(f"❌ Error HTTP al descargar el modelo: {e}")
-        st.stop()
 
-    except URLError as e:
-        st.error(f"❌ No se pudo acceder al modelo remoto: {e.reason}")
-        st.stop()
-
-    except FileNotFoundError:
-        st.error("❌ El archivo 'scaler.joblib' no está en el repositorio.")
-        st.stop()
-
-    except Exception as e:
-        st.error(f"❌ Error inesperado: {str(e)}")
-        st.stop()
-
-# --- Función de preprocesamiento ---
+# --- Preprocesamiento ---
 def preprocesar_dataframe(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     df = df.dropna().reset_index(drop=True)
 
@@ -67,81 +47,57 @@ def preprocesar_dataframe(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]
 
     return df_modelo, df_ids
 
-# --- Navegación lateral ---
-st.sidebar.title("🧭 Navegación")
-seccion = st.sidebar.radio("Selecciona módulo:", ["🔧 Preprocesamiento", "📈 Predicción"])
+# --- Archivo de entrada ---
+uploaded_file = st.file_uploader("📁 Sube tu archivo .xlsx con las citas médicas", type=["xlsx", "XLSX"])
 
-# --- Preprocesamiento ---
-if seccion == "🔧 Preprocesamiento":
-    st.title("🔧 Preprocesamiento de Datos")
+if uploaded_file:
+    df = pd.read_excel(uploaded_file)
+    st.subheader("Vista previa del archivo original:")
+    st.dataframe(df.head())
 
-    uploaded_file = st.file_uploader("Sube un archivo .xlsx", type=["xlsx", "XLSX"])
-
-    if uploaded_file:
-        df = pd.read_excel(uploaded_file)
-        st.subheader("Vista previa del archivo original:")
-        st.dataframe(df.head())
-
+    try:
         df_modelo, df_ids = preprocesar_dataframe(df)
+    except Exception as e:
+        st.error(f"❌ Error durante el preprocesamiento: {str(e)}")
+        st.stop()
 
-        st.success("✅ Preprocesamiento completado.")
-        st.subheader("Variables para el modelo:")
-        st.dataframe(df_modelo.head())
+    st.success("✅ Preprocesamiento completado.")
 
-        # Exportar datos preprocesados
-        output = BytesIO()
-        df_modelo.to_excel(output, index=False)
-        output.seek(0)
+    columnas_esperadas = [
+        'Age', 'Sex', 'Insurance Type', 'Number of Diseases',
+        'Recent Hospitalization', 'Number of Medications', 'Hour', 'Day',
+        'Month', 'Creation to Assignment Interval',
+        'Number of Previous Attendance', 'Number of Previous Non-Attendance'
+    ]
+    faltantes = [col for col in columnas_esperadas if col not in df_modelo.columns]
+    if faltantes:
+        st.error(f"❌ Faltan columnas requeridas para el modelo: {faltantes}")
+        st.stop()
 
-        st.download_button(
-            label="📥 Descargar datos para predicción",
-            data=output,
-            file_name="datos_preprocesados.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+    df_modelo = df_modelo[columnas_esperadas]
 
-# --- Predicción ---
-elif seccion == "📈 Predicción":
-    st.title("📈 Predicción con Modelo")
+    # Cargar modelo y hacer predicción
+    model, scaler = load_model_and_scaler()
+    X_scaled = scaler.transform(df_modelo)
+    pred = model.predict(X_scaled)
 
-    uploaded_file = st.file_uploader("Sube el archivo preprocesado (.xlsx)", type=["xlsx", "XLSX"])
+    # Agregar predicción
+    df_ids["Predicción"] = pred
+    df_ids["Predicción"] = df_ids["Predicción"].replace({0: "Inasistencia", 1: "Asistencia"})
 
-    if uploaded_file:
-        df_modelo = pd.read_excel(uploaded_file)
-        model, scaler = load_model_and_scaler()
+    # Mostrar y permitir descarga
+    st.success("✅ Predicción completada.")
+    st.subheader("Resultados:")
+    st.dataframe(df_ids)
 
-        columnas_esperadas = [
-            'Age', 'Sex', 'Insurance Type', 'Number of Diseases',
-            'Recent Hospitalization', 'Number of Medications', 'Hour', 'Day',
-            'Month', 'Creation to Assignment Interval',
-            'Number of Previous Attendance', 'Number of Previous Non-Attendance'
-        ]
-        faltantes = [col for col in columnas_esperadas if col not in df_modelo.columns]
+    output = BytesIO()
+    df_ids.to_excel(output, index=False)
+    output.seek(0)
 
-        if faltantes:
-            st.error(f"❌ Faltan columnas necesarias para el modelo: {faltantes}")
-            st.stop()
-
-        df_modelo = df_modelo[columnas_esperadas]
-
-        X_scaled = scaler.transform(df_modelo)
-        pred = model.predict(X_scaled)
-
-        df_modelo["Predicción"] = pred
-        df_modelo["Predicción"] = df_modelo["Predicción"].replace({0: "Inasistencia", 1: "Asistencia"})
-
-        st.success("✅ Predicción completada.")
-        st.dataframe(df_modelo)
-
-        # Descargar archivo con predicción
-        output = BytesIO()
-        df_modelo.to_excel(output, index=False)
-        output.seek(0)
-
-        st.download_button(
-            label="📥 Descargar archivo con predicciones",
-            data=output,
-            file_name="predicciones_resultado.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+    st.download_button(
+        label="📥 Descargar archivo con predicciones",
+        data=output,
+        file_name="predicciones_resultado.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
