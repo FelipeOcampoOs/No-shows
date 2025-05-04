@@ -4,48 +4,43 @@ import joblib
 from urllib.request import urlopen
 from io import BytesIO
 
-# --- Cargar modelo desde Hugging Face y scaler desde el repositorio ---
+# --- Cargar modelo directamente desde Hugging Face y scaler local ---
 @st.cache_resource
 def load_model_and_scaler():
-    model_url = "https://huggingface.co/felipeocampo/no-shows/resolve/main/modelnoshows.joblib"
-    model = joblib.load(urlopen(model_url))
-    scaler = joblib.load("scaler.joblib")  # Este archivo debe estar en tu repo
+    url = "https://huggingface.co/felipeocampo/no-shows/resolve/main/modelnoshows.joblib"
+    model = joblib.load(urlopen(url))  # carga directa desde Hugging Face
+    scaler = joblib.load("scaler.joblib")  # este archivo debe estar en el repositorio
     return model, scaler
 
-# Cargar modelo y scaler
 model, scaler = load_model_and_scaler()
 
-# --- Título de la app ---
+# --- Interfaz de usuario ---
 st.title("🩺 Predicción de Inasistencia Médica")
-st.write("Sube un archivo Excel con los datos de los pacientes para predecir la probabilidad de inasistencia.")
+st.write("Sube un archivo Excel con los datos de los pacientes para predecir si asistirán o no a su cita.")
 
-# --- Subida del archivo ---
-uploaded_file = st.file_uploader(
-    "📎 Sube tu archivo .xlsx",
-    type=["xlsx", "XLSX"],
-    key="file_upload"
-)
+# --- Subida de archivo ---
+uploaded_file = st.file_uploader("📎 Sube tu archivo .xlsx", type=["xlsx", "XLSX"], key="file_upload")
 
 if uploaded_file is not None:
     try:
-        # 1. Leer Excel
+        # 1. Leer archivo
         df = pd.read_excel(uploaded_file)
 
         # 2. Eliminar filas con valores nulos
         df = df.dropna()
 
-        # 3. Definir columnas clave
+        # 3. Columnas relevantes
         columnas_id = ['ID', 'Paciente', 'Nº documento']
         columnas_extra = ['Interlocutor', 'Un.org.planificada']
         columnas_a_remover = columnas_id + columnas_extra + ['Tipo de cita']
 
-        # 4. Separar identificadores
+        # 4. Guardar columnas para el archivo final
         df_ids = df[columnas_id + columnas_extra].copy()
 
-        # 5. Preparar columnas para el modelo
+        # 5. Preparar columnas del modelo
         df_modelo = df.drop(columns=columnas_a_remover, errors='ignore')
 
-        # 6. Renombrar columnas del español al inglés
+        # 6. Renombrar columnas a los nombres del modelo
         df_modelo = df_modelo.rename(columns={
             "Edad": "Age",
             "Género": "Sex",
@@ -61,7 +56,7 @@ if uploaded_file is not None:
             "Inasistencias previas": "Number of Previous Non-Attendance"
         })
 
-        # 7. Reordenar columnas
+        # 7. Reordenar columnas según el modelo
         orden_columnas = [
             'Age', 'Sex', 'Insurance Type', 'Number of Diseases',
             'Recent Hospitalization', 'Number of Medications', 'Hour', 'Day',
@@ -74,27 +69,26 @@ if uploaded_file is not None:
         X_scaled = scaler.transform(df_modelo)
         pred = model.predict(X_scaled)
 
-        # 9. Agregar resultados
+        # 9. Agregar predicción al archivo de salida
         df_ids["Predicción"] = pred
         df_ids["Predicción"] = df_ids["Predicción"].replace({0: "Inasistencia", 1: "Asistencia"})
 
-        # 10. Mostrar en pantalla
-        st.success("✅ Predicción completada exitosamente.")
+        # 10. Mostrar resultados
+        st.success("✅ Predicción completada.")
         st.dataframe(df_ids)
 
-        # 11. Descargar como Excel
+        # 11. Exportar resultado
         output = BytesIO()
         df_ids.to_excel(output, index=False)
         st.download_button(
-            label="📥 Descargar resultados en Excel",
+            label="📥 Descargar archivo con predicciones",
             data=output.getvalue(),
             file_name="predicciones_resultado.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
     except Exception as e:
-        st.error(f"❌ Ocurrió un error al procesar el archivo: {e}")
-
+        st.error(f"❌ Error al procesar el archivo: {e}")
 else:
-    st.info("⬆️ Esperando que subas un archivo Excel (.xlsx).")
+    st.info("⬆️ Sube un archivo Excel (.xlsx) para comenzar.")
 
