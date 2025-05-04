@@ -7,7 +7,6 @@ import gzip
 st.set_page_config(page_title="Predicción de Inasistencia", layout="centered")
 st.title("🩺 Predicción Automática de Inasistencia a Citas Médicas")
 
-# --- Cargar modelo y scaler ---
 @st.cache_resource
 def load_model_and_scaler():
     try:
@@ -15,10 +14,10 @@ def load_model_and_scaler():
             model = joblib.load(f)
         scaler = joblib.load("scaler.joblib")
         return model, scaler
-    except Exception as e:
-        st.error(f"❌ Error al cargar el modelo o scaler: {str(e)}")
-        st.stop()
 
+    except Exception as e:
+        st.error(f"❌ Error al cargar modelo o scaler: {str(e)}")
+        st.stop()
 # --- Preprocesamiento ---
 def preprocesar(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     df = df.dropna().reset_index(drop=True)
