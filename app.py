@@ -3,20 +3,23 @@ import pandas as pd
 import joblib
 from io import BytesIO
 from urllib.request import urlopen, URLError, HTTPError
+import gzip
+
 
 st.set_page_config(page_title="No Shows - Predicción", layout="centered")
 
-# --- Función para cargar el modelo (desde Hugging Face) y el scaler (local) ---
+
 @st.cache_resource
 def load_model_and_scaler():
     try:
-        model_url = "https://huggingface.co/felipeocampo/no-shows/resolve/main/modelnoshows.joblib"
-        with urlopen(model_url) as model_file:
-            model = joblib.load(model_file)
-
-        scaler = joblib.load("scaler.joblib")  # scaler local
+        with gzip.open("modelnoshows.joblib.gz", "rb") as f:
+            model = joblib.load(f)
+        scaler = joblib.load("scaler.joblib")
         return model, scaler
 
+    except Exception as e:
+        st.error(f"❌ Error al cargar modelo o scaler: {str(e)}")
+        st.stop()
     except HTTPError as e:
         if e.code == 429:
             st.error("⚠️ Hugging Face está limitando las descargas. Intenta más tarde.")
