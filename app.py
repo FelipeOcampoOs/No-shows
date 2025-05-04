@@ -1,24 +1,27 @@
 import streamlit as st
 import pandas as pd
 import joblib
-from io import BytesIO
 import gzip
+from io import BytesIO
 
 st.set_page_config(page_title="Predicción de Inasistencia", layout="centered")
 st.title("🩺 Predicción Automática de Inasistencia a Citas Médicas")
 
+# --- Cargar modelo y scaler desde archivos locales ---
 @st.cache_resource
 def load_model_and_scaler():
     try:
         with gzip.open("modelnoshows.joblib.gz", "rb") as f:
             model = joblib.load(f)
+
         scaler = joblib.load("scaler.joblib")
         return model, scaler
 
     except Exception as e:
         st.error(f"❌ Error al cargar modelo o scaler: {str(e)}")
         st.stop()
-# --- Preprocesamiento ---
+
+# --- Preprocesamiento de datos ---
 def preprocesar(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     df = df.dropna().reset_index(drop=True)
 
@@ -46,7 +49,7 @@ def preprocesar(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
 
     return df_modelo, df_ids
 
-# --- Subida de archivo ---
+# --- Subida de archivo Excel ---
 uploaded_file = st.file_uploader("📁 Sube tu archivo .xlsx con citas médicas", type=["xlsx", "XLSX"])
 
 if uploaded_file:
@@ -62,13 +65,16 @@ if uploaded_file:
         ]
         df_modelo = df_modelo[columnas_esperadas]
 
+        # --- Cargar modelo y predecir ---
         model, scaler = load_model_and_scaler()
         X_scaled = scaler.transform(df_modelo)
         pred = model.predict(X_scaled)
 
+        # --- Agregar predicción ---
         df_ids["Predicción"] = pred
         df_ids["Predicción"] = df_ids["Predicción"].replace({0: "Inasistencia", 1: "Asistencia"})
 
+        # --- Preparar archivo para descarga ---
         output = BytesIO()
         df_ids.to_excel(output, index=False)
         output.seek(0)
