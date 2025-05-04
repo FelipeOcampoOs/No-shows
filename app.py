@@ -7,6 +7,12 @@ st.title("🩺 Predicción de Asistencia a Citas Médicas")
 
 uploaded_file = st.file_uploader("Sube tu archivo .xlsx", type="xlsx")
 
+from urllib.request import urlopen
+import joblib
+
+# Cargar modelo desde Hugging Face
+model_url = "https://huggingface.co/felipeocampo/no-shows/resolve/main/modelnoshows.joblib"
+model = joblib.load(urlopen(model_url))
 
 if uploaded_file is not None:
     df = pd.read_excel(uploaded_file)
