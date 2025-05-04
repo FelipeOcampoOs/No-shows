@@ -2,27 +2,61 @@ import streamlit as st
 import pandas as pd
 import joblib
 from io import BytesIO
-from urllib.request import urlopen
+from urllib.request import urlopen, URLError, HTTPError
 
-st.title("🩺 Predicción de Asistencia a Citas Médicas")
+# --- Cargar modelo y scaler ---
+@st.cache_resource
+def load_model_and_scaler():
+    try:
+        model_url = "https://huggingface.co/felipeocampo/no-shows/resolve/main/modelnoshows.joblib"
+        with urlopen(model_url) as model_file:
+            model = joblib.load(model_file)
 
+        scaler = joblib.load("scaler.joblib")  # Archivo local
+        return model, scaler
+
+    except HTTPError as e:
+        if e.code == 429:
+            st.error("⚠️ Hugging Face está limitando las descargas. Intenta más tarde.")
+        else:
+            st.error(f"❌ Error HTTP al descargar el modelo: {e}")
+        st.stop()
+    except URLError as e:
+        st.error(f"❌ No se pudo acceder al modelo remoto: {e.reason}")
+        st.stop()
+    except FileNotFoundError:
+        st.error("❌ No se encontró el archivo local 'scaler.joblib'.")
+        st.stop()
+    except Exception as e:
+        st.error(f"❌ Error inesperado: {str(e)}")
+        st.stop()
+
+model, scaler = load_model_and_scaler()
+
+# --- Título de la app ---
+st.title("🩺 Predicción de Inasistencia Médica")
+
+# --- Cargar archivo del usuario ---
 uploaded_file = st.file_uploader("Sube tu archivo .xlsx", type=["xlsx", "XLSX"])
 
-if uploaded_file is not None:
+if uploaded_file:
     df = pd.read_excel(uploaded_file)
-
-    # 1. Eliminar filas con valores nulos
     df = df.dropna().reset_index(drop=True)
 
-    # 2. Columnas a conservar
+    # --- Columnas ---
     columnas_id = ['ID', 'Paciente', 'Nº documento']
     columnas_extra = ['Interlocutor', 'Un.org.planificada']
     columnas_a_remover = columnas_id + columnas_extra + ['Tipo de cita']
-    df_ids = df[columnas_id + columnas_extra]
 
-    # 3. Preparar datos
+    try:
+        df_ids = df[columnas_id + columnas_extra]
+    except KeyError:
+        st.error("❌ Faltan columnas identificadoras requeridas en el archivo.")
+        st.stop()
+
     df_modelo = df.drop(columns=columnas_a_remover, errors='ignore')
 
+    # --- Renombrar columnas ---
     df_modelo = df_modelo.rename(columns={
         "Edad": "Age",
         "Género": "Sex",
@@ -38,6 +72,7 @@ if uploaded_file is not None:
         "Inasistencias previas": "Number of Previous Non-Attendance"
     })
 
+    # --- Orden esperado por el modelo ---
     orden_columnas = [
         'Age', 'Sex', 'Insurance Type', 'Number of Diseases',
         'Recent Hospitalization', 'Number of Medications', 'Hour', 'Day',
@@ -45,38 +80,33 @@ if uploaded_file is not None:
         'Number of Previous Attendance', 'Number of Previous Non-Attendance'
     ]
 
-    if all(col in df_modelo.columns for col in orden_columnas):
-        df_modelo = df_modelo[orden_columnas]
+    # Verificar columnas requeridas
+    missing = [col for col in orden_columnas if col not in df_modelo.columns]
+    if missing:
+        st.error(f"❌ Faltan las siguientes columnas necesarias: {missing}")
+        st.stop()
 
-        # ✅ Cargar modelo y scaler desde Hugging Face
-        model_url = "https://huggingface.co/felipeocampo/no-shows/resolve/main/modelnoshows.joblib"
-        scaler_url = "https://huggingface.co/felipeocampo/no-shows/resolve/main/scaler.joblib"
-        model = joblib.load(urlopen(model_url))
-        scaler = joblib.load(urlopen(scaler_url))
+    df_modelo = df_modelo[orden_columnas]
 
-        # 4. Escalar y predecir
-        X_scaled = scaler.transform(df_modelo)
-        pred = model.predict(X_scaled)
+    # --- Predicción ---
+    X_scaled = scaler.transform(df_modelo)
+    pred = model.predict(X_scaled)
 
-        # 5. Agregar predicciones
-        df_ids["Predicción"] = pred
-        df_ids["Predicción"] = df_ids["Predicción"].replace({0: "Inasistencia", 1: "Asistencia"})
+    df_ids["Predicción"] = pred
+    df_ids["Predicción"] = df_ids["Predicción"].replace({0: "Inasistencia", 1: "Asistencia"})
 
-        st.success("✅ Predicción completada.")
-        st.dataframe(df_ids)
+    st.success("✅ Predicción completada.")
+    st.dataframe(df_ids)
 
-        # 6. Descargar archivo
-        output = BytesIO()
-        df_ids.to_excel(output, index=False)
-        output.seek(0)
+    # --- Descargar archivo con resultados ---
+    output = BytesIO()
+    df_ids.to_excel(output, index=False)
+    output.seek(0)
 
-        st.download_button(
-            label="📥 Descargar archivo con predicciones",
-            data=output,
-            file_name="predicciones_resultado.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-    else:
-        st.error("❌ Faltan columnas requeridas para la predicción.")
-
+    st.download_button(
+        label="📥 Descargar archivo con predicciones",
+        data=output,
+        file_name="predicciones_resultado.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
