@@ -1,10 +1,10 @@
 import streamlit as st
 import pandas as pd
-import requests
 import joblib
-from urllib.request import urlopen
+import requests
 from io import BytesIO
 
+# Cargar modelo y scaler
 @st.cache_resource
 def load_model_and_scaler():
     model_url = "https://huggingface.co/felipeocampo/no-shows/resolve/main/modelnoshows.joblib"
@@ -12,7 +12,7 @@ def load_model_and_scaler():
     response.raise_for_status()
     model = joblib.load(BytesIO(response.content))
 
-    scaler = joblib.load("scaler.joblib")  # este sigue local
+    scaler = joblib.load("scaler.joblib")  # local
     return model, scaler
 
 model, scaler = load_model_and_scaler()
@@ -32,12 +32,12 @@ if uploaded_file:
     columnas_extra = ['Interlocutor', 'Un.org.planificada']
     columnas_a_remover = columnas_id + columnas_extra + ['Tipo de cita']
 
-    df_ids = df[columnas_id + columnas_extra]  # conservar para el archivo final
+    df_ids = df[columnas_id + columnas_extra]  # conservar para exportación
 
     # 3. Preparar columnas para predicción
     df_modelo = df.drop(columns=columnas_a_remover, errors='ignore')
 
-    # 4. Renombrar columnas del español al inglés
+    # 4. Renombrar columnas
     df_modelo = df_modelo.rename(columns={
         "Edad": "Age",
         "Género": "Sex",
@@ -53,7 +53,7 @@ if uploaded_file:
         "Inasistencias previas": "Number of Previous Non-Attendance"
     })
 
-    # 5. Reordenar columnas
+    # 5. Reordenar columnas esperadas por el modelo
     orden_columnas = [
         'Age', 'Sex', 'Insurance Type', 'Number of Diseases',
         'Recent Hospitalization', 'Number of Medications', 'Hour', 'Day',
@@ -65,7 +65,7 @@ if uploaded_file:
     # 6. Escalar datos
     X_scaled = scaler.transform(df_modelo)
 
-    # 7. Predecir
+    # 7. Predicción
     pred = model.predict(X_scaled)
     df_ids["Predicción"] = pred
     df_ids["Predicción"] = df_ids["Predicción"].replace({0: "Inasistencia", 1: "Asistencia"})
