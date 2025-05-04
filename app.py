@@ -2,17 +2,11 @@ import streamlit as st
 import pandas as pd
 import joblib
 from io import BytesIO
+from urllib.request import urlopen
 
 st.title("🩺 Predicción de Asistencia a Citas Médicas")
 
-uploaded_file = st.file_uploader("Sube tu archivo .xlsx", type="xlsx")
-
-from urllib.request import urlopen
-import joblib
-
-# Cargar modelo desde Hugging Face
-model_url = "https://huggingface.co/felipeocampo/no-shows/resolve/main/modelnoshows.joblib"
-model = joblib.load(urlopen(model_url))
+uploaded_file = st.file_uploader("Sube tu archivo .xlsx", type=["xlsx", "XLSX"])
 
 if uploaded_file is not None:
     df = pd.read_excel(uploaded_file)
@@ -51,26 +45,27 @@ if uploaded_file is not None:
         'Number of Previous Attendance', 'Number of Previous Non-Attendance'
     ]
 
-    # Validar columnas
     if all(col in df_modelo.columns for col in orden_columnas):
         df_modelo = df_modelo[orden_columnas]
 
-        # 4. Cargar modelo y scaler
-        scaler = joblib.load("scaler.joblib")
-        model = joblib.load("modelnoshows.joblib")
+        # ✅ Cargar modelo y scaler desde Hugging Face
+        model_url = "https://huggingface.co/felipeocampo/no-shows/resolve/main/modelnoshows.joblib"
+        scaler_url = "https://huggingface.co/felipeocampo/no-shows/resolve/main/scaler.joblib"
+        model = joblib.load(urlopen(model_url))
+        scaler = joblib.load(urlopen(scaler_url))
 
-        # 5. Escalar y predecir
+        # 4. Escalar y predecir
         X_scaled = scaler.transform(df_modelo)
         pred = model.predict(X_scaled)
 
-        # 6. Agregar predicciones
+        # 5. Agregar predicciones
         df_ids["Predicción"] = pred
         df_ids["Predicción"] = df_ids["Predicción"].replace({0: "Inasistencia", 1: "Asistencia"})
 
         st.success("✅ Predicción completada.")
         st.dataframe(df_ids)
 
-        # 7. Descargar archivo
+        # 6. Descargar archivo
         output = BytesIO()
         df_ids.to_excel(output, index=False)
         output.seek(0)
@@ -83,4 +78,5 @@ if uploaded_file is not None:
         )
     else:
         st.error("❌ Faltan columnas requeridas para la predicción.")
+
 
