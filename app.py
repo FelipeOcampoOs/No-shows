@@ -5,7 +5,7 @@ import gzip
 from io import BytesIO
 
 st.set_page_config(page_title="Predicción de Inasistencia", layout="centered")
-st.title("🩺 Predicción Automática de Inasistencia a Citas Médicas")
+st.title("🩺 Predicción de inasistencias médicas")
 
 # --- Cargar modelo y scaler desde archivos locales ---
 @st.cache_resource
