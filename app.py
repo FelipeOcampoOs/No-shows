@@ -5,7 +5,8 @@ from io import BytesIO
 
 st.title("🩺 Predicción de Asistencia a Citas Médicas")
 
-uploaded_file = st.file_uploader("Sube tu archivo .xlsx", type="xlsx")
+uploaded_file = st.file_uploader("Sube tu archivo .xlsx", type=["xlsx", "XLSX"])
+
 
 if uploaded_file is not None:
     df = pd.read_excel(uploaded_file)
