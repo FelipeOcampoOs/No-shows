@@ -5,8 +5,7 @@ from io import BytesIO
 
 st.title("🩺 Predicción de Asistencia a Citas Médicas")
 
-uploaded_file = st.file_uploader("Sube tu archivo .xlsx")
-
+uploaded_file = st.file_uploader("Sube tu archivo .xlsx", type="xlsx")
 
 
 if uploaded_file is not None:
