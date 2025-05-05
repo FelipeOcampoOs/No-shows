@@ -76,7 +76,7 @@ if uploaded_file:
 
         # --- Preparar archivo para descarga ---
         output = BytesIO()
-        df_ids.to_excel(output, index=False)
+        df.to_excel(output, index=False)
         output.seek(0)
 
         st.success("✅ Archivo procesado correctamente.")
