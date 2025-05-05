@@ -71,8 +71,8 @@ if uploaded_file:
         pred = model.predict(X_scaled)
 
         # --- Agregar predicción ---
-        df_ids["Predicción"] = pred
-        df_ids["Predicción"] = df_ids["Predicción"].replace({0: "Inasistencia", 1: "Asistencia"})
+        df["Predicción"] = pred
+        df["Predicción"] = df["Predicción"].replace({0: "Inasistencia", 1: "Asistencia"})"})
 
         # --- Preparar archivo para descarga ---
         output = BytesIO()
