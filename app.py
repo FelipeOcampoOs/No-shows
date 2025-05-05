@@ -72,7 +72,7 @@ if uploaded_file:
 
         # --- Agregar predicción ---
         df["Predicción"] = pred
-        df["Predicción"] = df["Predicción"].replace({0: "Inasistencia", 1: "Asistencia"})"})
+        df["Predicción"] = df["Predicción"].replace({0: "Inasistencia", 1: "Asistencia"})
 
         # --- Preparar archivo para descarga ---
         output = BytesIO()
